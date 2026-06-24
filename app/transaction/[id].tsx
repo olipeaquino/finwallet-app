@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Calendar, FileText, Trash2, TrendingUp, TrendingDown, Clock } from 'lucide-react-native';
-import { useState, useEffect } from 'react';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { ArrowLeft, Calendar, FileText, Trash2, TrendingUp, TrendingDown, Clock, Pencil } from 'lucide-react-native';
+import { useState, useCallback } from 'react';
 import { Card, Button, GradientCard, AnimatedView, showAlert } from '@/components/ui';
 import { useThemeContext } from '@/providers';
 import { transactionService } from '@/services';
@@ -19,21 +19,27 @@ export default function TransactionDetailScreen() {
     const [transaction, setTransaction] = useState<Transaction | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const loadTransaction = async () => {
-            if (!id) return;
-            setIsLoading(true);
-            try {
-                const tx = await transactionService.getById(id);
-                setTransaction(tx);
-            } catch (error) {
-                console.error('Error loading transaction:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        loadTransaction();
-    }, [id]);
+    useFocusEffect(
+        useCallback(() => {
+            const loadTransaction = async () => {
+                if (!id) return;
+                try {
+                    const tx = await transactionService.getById(id);
+                    setTransaction(tx);
+                } catch (error) {
+                    console.error('Error loading transaction:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            loadTransaction();
+        }, [id])
+    );
+
+    const handleEdit = () => {
+        if (!transaction) return;
+        router.push({ pathname: '/transaction/new', params: { id: transaction.id } } as any);
+    };
 
     const handleDelete = () => {
         if (!transaction) return;
@@ -126,12 +132,20 @@ export default function TransactionDetailScreen() {
                             <Text style={{ fontSize: 17, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.2 }}>
                                 Detalhes
                             </Text>
-                            <Pressable
-                                onPress={handleDelete}
-                                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                                <Trash2 color="white" size={18} />
-                            </Pressable>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Pressable
+                                    onPress={handleEdit}
+                                    style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                    <Pencil color="white" size={17} />
+                                </Pressable>
+                                <Pressable
+                                    onPress={handleDelete}
+                                    style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                    <Trash2 color="white" size={18} />
+                                </Pressable>
+                            </View>
                         </View>
 
                         <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}>
@@ -239,7 +253,16 @@ export default function TransactionDetailScreen() {
                 </AnimatedView>
 
                 <AnimatedView animation="fadeInUp" delay={200}>
-                    <View style={{ paddingHorizontal: 16 }}>
+                    <View style={{ paddingHorizontal: 16, gap: 12 }}>
+                        <Button
+                            variant="primary"
+                            fullWidth
+                            size="lg"
+                            onPress={handleEdit}
+                            leftIcon={<Pencil color="white" size={20} />}
+                        >
+                            Editar Transação
+                        </Button>
                         <Button
                             variant="destructive"
                             fullWidth

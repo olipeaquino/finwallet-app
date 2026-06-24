@@ -1,31 +1,61 @@
 import { View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { X, Check, Calendar, TrendingUp, TrendingDown, DollarSign } from 'lucide-react-native';
+import { X, Check, Calendar, TrendingUp, TrendingDown, DollarSign, AlertCircle } from 'lucide-react-native';
 import { useState, useEffect, useRef } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Button, Card, Input, GradientCard, AnimatedView, getStaggerDelay, showAlert } from '@/components/ui';
+import { Button, Card, Input, GradientCard, AnimatedView, getStaggerDelay, showAlert, DialogHost } from '@/components/ui';
 import { useThemeContext } from '@/providers';
 import { useTransactionStore } from '@/stores';
-import { categoryService } from '@/services';
+import { categoryService, transactionService } from '@/services';
 import { colors, glow } from '@/constants';
 import { Category } from '@/types';
 
 export default function NewTransactionScreen() {
     const router = useRouter();
-    const { type: typeParam } = useLocalSearchParams<{ type?: string }>();
+    const { type: typeParam, id: editIdParam } = useLocalSearchParams<{ type?: string; id?: string }>();
+    const editId = typeof editIdParam === 'string' ? editIdParam : undefined;
+    const isEditing = !!editId;
     const { isDark } = useThemeContext();
-    const { addTransaction, isLoading } = useTransactionStore();
+    const { addTransaction, updateTransaction, isLoading } = useTransactionStore();
     const amountInputRef = useRef<TextInput>(null);
 
     const [type, setType] = useState<'income' | 'expense'>(typeParam === 'income' ? 'income' : 'expense');
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+    const [initialCategoryId, setInitialCategoryId] = useState<string | null>(null);
     const [date, setDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
     const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+    const [errors, setErrors] = useState<{ amount?: string; description?: string; category?: string }>({});
+
+    useEffect(() => {
+        if (!editId) return;
+        const id = editId;
+        let mounted = true;
+        async function loadTransaction() {
+            try {
+                const tx = await transactionService.getById(id);
+                if (tx && mounted) {
+                    setType(tx.type);
+                    setAmount(String(tx.amount));
+                    setDescription(tx.description);
+                    const datePart = String(tx.date).split('T')[0];
+                    const [y, m, d] = datePart.split('-').map(Number);
+                    if (y && m && d) setDate(new Date(y, m - 1, d));
+                    setInitialCategoryId(tx.category_id);
+                }
+            } catch (error) {
+                console.error('Error loading transaction:', error);
+            }
+        }
+        loadTransaction();
+        return () => {
+            mounted = false;
+        };
+    }, [editId]);
 
     useEffect(() => {
         async function loadCategories() {
@@ -34,7 +64,10 @@ export default function NewTransactionScreen() {
                 const cats = await categoryService.getAll(type);
                 setCategories(cats);
                 if (cats.length > 0) {
-                    setSelectedCategory(cats[0]);
+                    const preferred = initialCategoryId
+                        ? cats.find((c) => c.id === initialCategoryId)
+                        : undefined;
+                    setSelectedCategory(preferred ?? cats[0]);
                 }
             } catch (error) {
                 console.error('Error loading categories:', error);
@@ -43,7 +76,7 @@ export default function NewTransactionScreen() {
             }
         }
         loadCategories();
-    }, [type]);
+    }, [type, initialCategoryId]);
 
     const parseAmount = (value: string): number => {
         const cleaned = value.replace(/[^\d]/g, '');
@@ -62,6 +95,7 @@ export default function NewTransactionScreen() {
     const handleAmountChange = (text: string) => {
         const cleaned = text.replace(/[^\d]/g, '');
         setAmount(cleaned);
+        if (errors.amount) setErrors((prev) => ({ ...prev, amount: undefined }));
     };
 
     const focusAmountInput = () => {
@@ -69,30 +103,36 @@ export default function NewTransactionScreen() {
     };
 
     const handleSave = async () => {
+        const nextErrors: { amount?: string; description?: string; category?: string } = {};
         if (!amount || parseAmount(amount) === 0) {
-            showAlert('Erro', 'Informe um valor válido');
-            return;
+            nextErrors.amount = 'Informe um valor válido';
         }
-
         if (!description.trim()) {
-            showAlert('Erro', 'Informe uma descrição');
-            return;
+            nextErrors.description = 'Informe uma descrição';
         }
-
         if (!selectedCategory) {
-            showAlert('Erro', 'Selecione uma categoria');
+            nextErrors.category = 'Selecione uma categoria';
+        }
+        if (nextErrors.amount || nextErrors.description || !selectedCategory) {
+            setErrors(nextErrors);
             return;
         }
+        setErrors({});
+
+        const payload = {
+            type,
+            amount: parseAmount(amount),
+            description: description.trim(),
+            category_id: selectedCategory.id,
+            date: date.toISOString().split('T')[0],
+        };
 
         try {
-            await addTransaction({
-                type,
-                amount: parseAmount(amount),
-                description: description.trim(),
-                category_id: selectedCategory.id,
-                date: date.toISOString().split('T')[0],
-            });
-
+            if (isEditing && editId) {
+                await updateTransaction(editId, payload);
+            } else {
+                await addTransaction(payload);
+            }
             router.back();
         } catch (error) {
             showAlert('Erro', 'Não foi possível salvar a transação');
@@ -161,7 +201,7 @@ export default function NewTransactionScreen() {
                                     <X color="white" size={20} />
                                 </Pressable>
                                 <Text style={{ fontSize: 17, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.2 }}>
-                                    Nova {isExpense ? 'Despesa' : 'Receita'}
+                                    {isEditing ? 'Editar' : 'Nova'} {isExpense ? 'Despesa' : 'Receita'}
                                 </Text>
                                 <View style={{ width: 40 }} />
                             </View>
@@ -218,6 +258,14 @@ export default function NewTransactionScreen() {
                                 <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.60)', marginTop: 6 }}>
                                     Toque para editar
                                 </Text>
+                                {errors.amount ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 10, backgroundColor: 'rgba(0,0,0,0.28)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 }}>
+                                        <AlertCircle color="#FFFFFF" size={13} />
+                                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
+                                            {errors.amount}
+                                        </Text>
+                                    </View>
+                                ) : null}
                                 <TextInput
                                     ref={amountInputRef}
                                     value={amount}
@@ -242,7 +290,11 @@ export default function NewTransactionScreen() {
                                 label="Descrição"
                                 placeholder="Ex: Almoço no restaurante"
                                 value={description}
-                                onChangeText={setDescription}
+                                onChangeText={(text) => {
+                                    setDescription(text);
+                                    if (errors.description) setErrors((prev) => ({ ...prev, description: undefined }));
+                                }}
+                                error={errors.description}
                                 leftIcon={
                                     <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: typeColor + '1A', alignItems: 'center', justifyContent: 'center' }}>
                                         <DollarSign color={typeColor} size={18} />
@@ -285,7 +337,10 @@ export default function NewTransactionScreen() {
                                                     delay={getStaggerDelay(index, 40)}
                                                 >
                                                     <Pressable
-                                                        onPress={() => setSelectedCategory(cat)}
+                                                        onPress={() => {
+                                                            setSelectedCategory(cat);
+                                                            if (errors.category) setErrors((prev) => ({ ...prev, category: undefined }));
+                                                        }}
                                                         style={{
                                                             paddingHorizontal: 14,
                                                             paddingVertical: 8,
@@ -328,6 +383,14 @@ export default function NewTransactionScreen() {
                                         })}
                                     </View>
                                 )}
+                                {errors.category ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                                        <AlertCircle color={colors.error} size={14} />
+                                        <Text style={{ color: colors.error, fontSize: 13, fontWeight: '500', marginLeft: 5 }}>
+                                            {errors.category}
+                                        </Text>
+                                    </View>
+                                ) : null}
                             </View>
 
                             <View style={{ marginTop: 20 }}>
@@ -396,12 +459,13 @@ export default function NewTransactionScreen() {
                                     : <TrendingUp color="white" size={20} />
                                 }
                             >
-                                Salvar {isExpense ? 'Despesa' : 'Receita'}
+                                {isEditing ? 'Salvar Alterações' : `Salvar ${isExpense ? 'Despesa' : 'Receita'}`}
                             </Button>
                         </View>
                     </AnimatedView>
                 </ScrollView>
             </KeyboardAvoidingView>
+            <DialogHost />
         </SafeAreaView>
     );
 }

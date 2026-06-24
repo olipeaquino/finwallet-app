@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform, TextInput, InputAccessoryView, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +9,8 @@ import { useThemeContext } from '@/providers';
 import { budgetService, categoryService } from '@/services';
 import { colors, elevation } from '@/constants';
 import { Category } from '@/types';
+
+const AMOUNT_ACCESSORY_ID = 'budgetNewAmountAccessory';
 
 export default function NewBudgetScreen() {
     const router = useRouter();
@@ -162,6 +164,8 @@ export default function NewBudgetScreen() {
                     className="flex-1"
                     contentContainerStyle={{ padding: 16 }}
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
                 >
                     <AnimatedView animation="fadeInDown" delay={80}>
                         <View
@@ -208,6 +212,7 @@ export default function NewBudgetScreen() {
                                     onChangeText={handleAmountChange}
                                     placeholder="0,00"
                                     keyboardType="numeric"
+                                    inputAccessoryViewID={Platform.OS === 'ios' ? AMOUNT_ACCESSORY_ID : undefined}
                                     style={{
                                         fontSize: 40,
                                         fontWeight: '800',
@@ -426,6 +431,16 @@ export default function NewBudgetScreen() {
                         </Button>
                     </View>
                 </AnimatedView>
+
+                {Platform.OS === 'ios' && (
+                    <InputAccessoryView nativeID={AMOUNT_ACCESSORY_ID}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: surfaceVariant, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: borderColor }}>
+                            <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8} style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+                                <Text style={{ color: colors.primary[500], fontWeight: '700', fontSize: 16 }}>Concluir</Text>
+                            </Pressable>
+                        </View>
+                    </InputAccessoryView>
+                )}
             </KeyboardAvoidingView>
         </SafeAreaView>
     );

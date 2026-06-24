@@ -119,9 +119,11 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         try {
             const transaction = await transactionService.create(data);
 
-            await get().refreshAll();
-
+            // Solta o loading assim que o INSERT termina e atualiza os agregados em
+            // segundo plano — assim o modal fecha na hora em vez de travar esperando
+            // as 5 queries do refreshAll().
             set({ isLoading: false });
+            void get().refreshAll();
             return transaction;
         } catch (error) {
             set({ error: (error as Error).message, isLoading: false });
@@ -133,8 +135,8 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             await transactionService.update(id, data);
-            await get().refreshAll();
             set({ isLoading: false });
+            void get().refreshAll();
         } catch (error) {
             set({ error: (error as Error).message, isLoading: false });
             throw error;
@@ -145,8 +147,8 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             await transactionService.delete(id);
-            await get().refreshAll();
             set({ isLoading: false });
+            void get().refreshAll();
         } catch (error) {
             set({ error: (error as Error).message, isLoading: false });
             throw error;

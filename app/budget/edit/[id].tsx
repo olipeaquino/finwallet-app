@@ -1,4 +1,4 @@
-import { View, Text, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, TextInput, KeyboardAvoidingView, Platform, InputAccessoryView, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +9,8 @@ import { useThemeContext } from '@/providers';
 import { budgetService } from '@/services';
 import { colors, elevation, glow } from '@/constants';
 import { Budget } from '@/types';
+
+const AMOUNT_ACCESSORY_ID = 'budgetEditAmountAccessory';
 
 export default function EditBudgetScreen() {
     const router = useRouter();
@@ -225,6 +227,7 @@ export default function EditBudgetScreen() {
                     </View>
                 </AnimatedView>
 
+                <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()} accessible={false}>
                 <View style={{ padding: 16 }}>
                     <AnimatedView animation="fadeInDown" delay={80}>
                         <View
@@ -335,6 +338,7 @@ export default function EditBudgetScreen() {
                                     placeholder="0,00"
                                     keyboardType="numeric"
                                     autoFocus
+                                    inputAccessoryViewID={Platform.OS === 'ios' ? AMOUNT_ACCESSORY_ID : undefined}
                                     style={{
                                         fontSize: 40,
                                         fontWeight: '800',
@@ -426,6 +430,7 @@ export default function EditBudgetScreen() {
                         </View>
                     </AnimatedView>
                 </View>
+                </TouchableWithoutFeedback>
 
                 <View style={{ paddingHorizontal: 16, paddingBottom: 16, marginTop: 'auto' }}>
                     <Button
@@ -439,6 +444,16 @@ export default function EditBudgetScreen() {
                         Salvar Alterações
                     </Button>
                 </View>
+
+                {Platform.OS === 'ios' && (
+                    <InputAccessoryView nativeID={AMOUNT_ACCESSORY_ID}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: surfaceVariant, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: borderColor }}>
+                            <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8} style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+                                <Text style={{ color: colors.primary[500], fontWeight: '700', fontSize: 16 }}>Concluir</Text>
+                            </Pressable>
+                        </View>
+                    </InputAccessoryView>
+                )}
             </KeyboardAvoidingView>
         </SafeAreaView>
     );

@@ -53,6 +53,7 @@ export function DialogHost() {
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
+        const previousHandler = showHandler;
         showHandler = (o: DialogOptions) => {
             setOpts(o);
             setVisible(true);
@@ -65,8 +66,11 @@ export function DialogHost() {
                 hapticService.light();
             }
         };
+        // Restaura o handler anterior ao desmontar. Telas apresentadas como modal
+        // nativo (presentation: 'modal') montam seu próprio <DialogHost />; sem isso
+        // o diálogo renderiza ATRÁS do modal e fica invisível no iOS.
         return () => {
-            showHandler = null;
+            showHandler = previousHandler;
         };
     }, []);
 

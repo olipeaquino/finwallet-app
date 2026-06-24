@@ -5,7 +5,7 @@ import { X, Calendar, Palette, Lightbulb, CheckCircle } from 'lucide-react-nativ
 import { useState, useRef } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Button, Card, Input, AnimatedView, showAlert } from '@/components/ui';
+import { Button, Card, Input, AnimatedView, showAlert, DialogHost } from '@/components/ui';
 import { useThemeContext } from '@/providers';
 import { useGoalStore } from '@/stores';
 import { colors } from '@/constants';
@@ -390,6 +390,7 @@ export default function NewGoalScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+            <DialogHost />
         </SafeAreaView>
     );
 }
